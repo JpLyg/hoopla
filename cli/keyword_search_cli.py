@@ -6,6 +6,7 @@ import os
 import string
 from nltk.stem import PorterStemmer
 import InvertedIndex
+import math
 
 
 def main() -> None:
@@ -17,11 +18,18 @@ def main() -> None:
 
     subparsers.add_parser("build", help="Build inverted index")
 
+    tf_parser = subparsers.add_parser("tf", help="Get the term frequency for a term in a document")
+    tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    tf_parser.add_argument("term", type=str, help="Term to search for")
+
+    #step 1
+    idf_parser = subparsers.add_parser("idf", help="Build inverted index")
+    idf_parser.add_argument("term", type=str, help="IDF Operation")
+
     args = parser.parse_args()
     here = os.path.dirname(__file__)
     path_movies = os.path.join(here, "..", "data", "movies.json")
     path_stopwords = os.path.join(here,"..","data","stopwords.txt")
-
     punct_table = str.maketrans('', '', string.punctuation)
     stemmer = PorterStemmer()
 
@@ -35,48 +43,63 @@ def main() -> None:
         case "search":
             try:
                 idx.load()
-                print(idx.index.get("brave", set()))
+                
             except FileNotFoundError as e:
                 print(f"Error: {e}")
-                return
-            
+                return     
             print("Searching for: " +args.query)
 
-            #data = load_movies(path_movies)
             results = set()
             
-
             for i in split_vals(translates(args.query,punct_table),stopwords_set,stemmer):
                 results.update(idx.index.get(i, set()))
-                #if len(results)>= 5:break
                 
             results = sorted(results)[:5]
             print(results)
 
             for i in results:
                 print (f"title: {idx.docmap[i]} id: {i}")
+
+        case "idf":
+            try:
+                idx.load()
                 
-            '''for r in data["movies"]:
-                for i in split_vals(translates(args.query,punct_table),stopwords_set,stemmer):
-                    if i in split_vals(translates(r["title"],punct_table),stopwords_set,stemmer):
-                        results.append(r)
-                        break
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+                return
+            
+            docmap_count = len(idx.docmap)
 
-            results.sort(key=lambda m: m["id"])'''
-            
-            
-            
+            proper_term = split_vals(args.term,stopwords_set,stemmer)
+
+            postings = idx.index.get(proper_term[0], set())
+            term_doc_count = len(postings)
+
+            idf_val = math.log((docmap_count+1)/(term_doc_count+1))
 
             
+            print(f"Inverse document frequency of '{args.term}': {idf_val:.2f} | doc count: {docmap_count} | term doc count: {term_doc_count}")
+
+        case "tf":
+            try:
+                idx.load()
+                
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+                return
+
+            val_count = idx.get_tf(args.doc_id,args.term,punct_table,stopwords_set,stemmer)
+
+            print(f"doc ID:{args.doc_id}: {val_count}")
 
         case "build":
             
             movies = load_movies(path_movies)
             idx.build(movies["movies"],punct_table,stopwords_set,stemmer)
             idx.save()
-            
-            #print(docs)
-            #print(f"First document for token 'merida' = {docs[0]}")
+
+            print(len(idx.docmap))
+
         case _:
             parser.print_help()
 
