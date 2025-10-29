@@ -29,6 +29,10 @@ def main() -> None:
     bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
     bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
 
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument("--limit", type=int, default=5, help="Search query")
+
     tf_parser = subparsers.add_parser("tf", help="Get the term frequency for a term in a document")
     tf_parser.add_argument("doc_id", type=int, help="Document ID")
     tf_parser.add_argument("term", type=str, help="Term to search for")
@@ -52,7 +56,7 @@ def main() -> None:
         stopwords = f.read()
     stopwords_set= set(stopwords.splitlines())
 
-    idx = InvertedIndex.InvertedIndex(punct_table,stopwords_set,stemmer)
+    idx = InvertedIndex.InvertedIndex(punct_table,stopwords_set,stemmer,BM25_K1,BM25_B)
     
 
     match args.command:
@@ -75,6 +79,21 @@ def main() -> None:
 
             for i in results:
                 print (f"title: {idx.docmap[i]} id: {i}")
+
+        case "bm25search":
+            try:
+                idx.load()
+                
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+                return
+            
+            bm25_scores = idx.bm25_search(args.query,args.limit)
+            count = 1
+            for doc_id, score in bm25_scores:
+                title = idx.docmap[doc_id]
+                print(f"{count}. {title} - Score: {score:.2f}")
+            
 
         case "bm25tf":
             try:

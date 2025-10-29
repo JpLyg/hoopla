@@ -7,11 +7,13 @@ import math
 class InvertedIndex:
     
     
-    def __init__(self,punc_tbl,stopwords,stems):
+    def __init__(self,punc_tbl,stopwords,stems,k1,b):
         self.index = {}
         self.docmap = {}
         self.term_frequencies = {}
         self.doc_lengths = {}
+        self.k1 = k1
+        self.b = b
 
 
 
@@ -111,7 +113,9 @@ class InvertedIndex:
 
         return bm25
 
-    def get_bm25_tf(self, doc_id: int, term: str, k1: float,b:float) -> float:
+    def get_bm25_tf(self, doc_id: int, term: str) -> float:
+        k1 = self.k1
+        b = self.b
         tf = self.get_tf(doc_id,term)
         if tf == 0:
             return 0.0
@@ -126,7 +130,26 @@ class InvertedIndex:
 
         return bm25_saturation
     
-    # python
+    def bm25(self,doc_id,term):
+        idf = self.get_bm25_idf(term)
+        tf = self.get_bm25_tf(doc_id,term)
+
+        return tf * idf
+    
+    def bm25_search(self, query, limit):
+        tokens = self.__tokenize(query)
+        scores = {}
+        for tok in tokens:
+            for doc_id in self.index.get(tok,{}):
+                if doc_id not in scores:
+                    scores[doc_id] = self.bm25(doc_id,tok)
+                else:
+                    scores[doc_id] += self.bm25(doc_id,tok)
+        
+        results = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+
+        return results
+
     def __get_avg_doc_length(self) -> float:
         if not self.doc_lengths:
             return 0.0
